@@ -5,6 +5,11 @@ import cv2
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+import anthropic
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -15,16 +20,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
 @app.post("/api/analyze")
 async def analyze(image: UploadFile = File(...)):
+    # 画像をバイトデータとして読み込む
     contents = await image.read()
     nparr = np.frombuffer(contents, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-    # OpenCVのBGRをRGBに変換
+    # MediaPipeで骨格解析
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    # MediaPipe新APIで骨格解析
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
 
     base_options = python.BaseOptions(model_asset_path='pose_landmarker.task')
@@ -38,17 +44,46 @@ async def analyze(image: UploadFile = File(...)):
 
     lm = results.pose_landmarks[0]
 
-    # リーチ：左手首(15)〜右手首(16)
     reach = abs(lm[15].x - lm[16].x)
-    # スタンス幅：左足首(27)〜右足首(28)
     stance = abs(lm[27].x - lm[28].x)
-    # 重心：両肩(11,12)の中点Y
     center_y = (lm[11].y + lm[12].y) / 2
 
-    return {
-        "filename": image.filename,
+    scores = {
         "reach_ratio": round(reach, 3),
         "stance_ratio": round(stance, 3),
         "center_y": round(center_y, 3),
-        "message": "骨格解析成功"
+    }
+
+    # Claude APIで分析文を生成
+    message = claude.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": f"""あなたは格闘技の専門コーチです。
+以下の骨格分析スコアをもとに格闘技の適性を分析してください。
+
+【骨格スコア】
+- リーチ比率: {scores['reach_ratio']}（0〜1、高いほどリーチが長い）
+- スタンス幅: {scores['stance_ratio']}（0〜1、高いほどスタンスが広い）
+- 重心の高さ: {scores['center_y']}（0〜1、低いほど重心が高い位置）
+
+以下の項目を日本語で簡潔に答えてください。
+1. 強み
+2. 弱点
+3. 適したファイタータイプ
+4. 改善ポイント（3つ）
+5. ロールモデルにすべき有名選手（1名、理由も）"""
+            }
+        ]
+    )
+
+    analysis = message.content[0].text
+
+    return {
+        "filename": image.filename,
+        "scores": scores,
+        "analysis": analysis,
+        "message": "分析完了"
     }
