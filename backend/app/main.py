@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import cv2
@@ -23,7 +23,14 @@ app.add_middleware(
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 @app.post("/api/analyze")
-async def analyze(image: UploadFile = File(...)):
+async def analyze(
+    image: UploadFile = File(...),
+    height: float = Form(0),
+    weight: float = Form(0),
+    age: int = Form(0),
+    background: str = Form(""),
+    strong_move: str = Form(""),
+):
     # 画像をバイトデータとして読み込む
     contents = await image.read()
     nparr = np.frombuffer(contents, np.uint8)
@@ -62,7 +69,14 @@ async def analyze(image: UploadFile = File(...)):
             {
                 "role": "user",
                 "content": f"""あなたは格闘技の専門コーチです。
-以下の骨格分析スコアをもとに格闘技の適性を分析してください。
+以下の情報をもとに格闘技の適性を分析してください。
+
+【基礎データ】
+- 身長: {height}cm
+- 体重: {weight}kg
+- 年齢: {age}歳
+- バックボーン: {background if background else "未入力"}
+- 得意技: {strong_move if strong_move else "未入力"}
 
 【骨格スコア】
 - リーチ比率: {scores['reach_ratio']}（0〜1、高いほどリーチが長い）
