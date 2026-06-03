@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import numpy as np
 import cv2
 import mediapipe as mp
@@ -8,10 +9,17 @@ from mediapipe.tasks.python import vision
 import anthropic
 import os
 from dotenv import load_dotenv
+from app.services import vector_store
+from app.services.rag_svc import retrieve_similar_fighters
 
 load_dotenv()
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app):
+    vector_store.init()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,6 +69,9 @@ async def analyze(
         "center_y": round(center_y, 3),
     }
 
+    # RAGで類似選手を取得
+    fighter_context = retrieve_similar_fighters(scores, background)
+
     # Claude APIで分析文を生成
     message = claude.messages.create(
         model="claude-sonnet-4-6",
@@ -83,12 +94,15 @@ async def analyze(
 - スタンス幅: {scores['stance_ratio']}（0〜1、高いほどスタンスが広い）
 - 重心の高さ: {scores['center_y']}（0〜1、低いほど重心が高い位置）
 
+## 参考選手情報（データベースより取得）
+{fighter_context}
+
 以下の項目を日本語で簡潔に答えてください。
 1. 強み
 2. 弱点
 3. 適したファイタータイプ
 4. 改善ポイント（3つ）
-5. ロールモデルにすべき有名選手（1名、理由も）"""
+5. ロールモデルにすべき有名選手（1名、理由も・必ず上記参考選手から選ぶこと）"""
             }
         ]
     )
