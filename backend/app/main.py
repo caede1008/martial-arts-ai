@@ -11,6 +11,7 @@ import os
 from dotenv import load_dotenv
 from app.services import vector_store
 from app.services.rag_svc import retrieve_similar_fighters
+from app.services import cnn_svc
 
 load_dotenv()
 
@@ -69,6 +70,9 @@ async def analyze(
         "center_y": round(center_y, 3),
     }
 
+    # CNNで競技適性スコアを取得
+    cnn_result = cnn_svc.predict(contents)
+
     # RAGで類似選手を取得
     fighter_context = retrieve_similar_fighters(scores, background)
 
@@ -94,6 +98,13 @@ async def analyze(
                 - スタンス幅: {scores['stance_ratio']}（0〜1、高いほどスタンスが広い）
                 - 重心の高さ: {scores['center_y']}（0〜1、低いほど重心が高い位置）
 
+                【体型・競技適性スコア（CNN判定）】
+                - BJJ適性:       {cnn_result['scores']['bjj']:.1%}
+                - ボクシング適性: {cnn_result['scores']['boxing']:.1%}
+                - ムエタイ適性:   {cnn_result['scores']['muaythai']:.1%}
+                - レスリング適性: {cnn_result['scores']['wrestling']:.1%}
+                - 最も高い適性:   {cnn_result['top_class']}（{cnn_result['top_score']:.1%}）
+
                 ## 参考選手情報（データベースより取得）
                 {fighter_context}
 
@@ -112,6 +123,7 @@ async def analyze(
     return {
         "filename": image.filename,
         "scores": scores,
+        "cnn_result": cnn_result,
         "analysis": analysis,
         "message": "分析完了"
     }
