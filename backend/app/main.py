@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 from app.services import vector_store
 from app.services.rag_svc import retrieve_similar_fighters
 from app.services import cnn_svc
+from app.routers import chat
+
 
 load_dotenv()
 
@@ -21,6 +23,8 @@ async def lifespan(app):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+app.include_router(chat.router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,7 +78,7 @@ async def analyze(
     cnn_result = cnn_svc.predict(contents)
 
     # RAGで類似選手を取得
-    fighter_context = retrieve_similar_fighters(scores, background)
+    fighter_context = retrieve_similar_fighters(scores, background, cnn_result)
 
     # Claude APIで分析文を生成
     message = claude.messages.create(

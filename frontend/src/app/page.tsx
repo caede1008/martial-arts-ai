@@ -28,6 +28,12 @@ type Result = {
   message: string
 }
 
+type ChatMessage = {
+  role: "user" | "assistant"
+  content: string
+  category?: string
+}
+
 const SPORT_CONFIG = [
   { key: "bjj",       label: "BJJ（柔術）", color: "#9b59b6", icon: "🥋" },
   { key: "boxing",    label: "ボクシング",   color: "#3498db", icon: "🥊" },
@@ -46,7 +52,9 @@ export default function Home() {
   const [age, setAge] = useState("")
   const [background, setBackground] = useState("")
   const [strongMove, setStrongMove] = useState("")
-
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState("")
+  const [chatLoading, setChatLoading] = useState(false)
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
@@ -150,19 +158,11 @@ export default function Home() {
           <div className={styles.inputGrid2}>
             <div className={styles.dataCell}>
               <label className={styles.inputLabel}>バックボーン</label>
-              {background ? (
-                <div className={styles.dataValueText} onClick={() => setBackground("")}>{background}</div>
-              ) : (
-                <input type="text" value={background} onChange={e => setBackground(e.target.value)} placeholder="例：柔道10年" className={styles.input} />
-              )}
+              <input type="text" value={background} onChange={e => setBackground(e.target.value)} placeholder="例：柔道10年" className={styles.input} />
             </div>
             <div className={styles.dataCell}>
               <label className={styles.inputLabel}>得意技</label>
-              {strongMove ? (
-                <div className={styles.dataValueText} onClick={() => setStrongMove("")}>{strongMove}</div>
-              ) : (
-                <input type="text" value={strongMove} onChange={e => setStrongMove(e.target.value)} placeholder="例：内股" className={styles.input} />
-              )}
+              <input type="text" value={strongMove} onChange={e => setStrongMove(e.target.value)} placeholder="例：内股" className={styles.input} />
             </div>
           </div>
         </div>
@@ -202,8 +202,8 @@ export default function Home() {
                 </div>
                 <ResponsiveContainer width="100%" height={160}>
                   <RadarChart data={chartData}>
-                    <PolarGrid stroke="#222" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: "#666", fontSize: 11 }} />
+                    <PolarGrid stroke="#6c6c6c" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: "#aaa", fontSize: 11 }} />
                     <Radar dataKey="value" stroke="#e53e3e" fill="#e53e3e" fillOpacity={0.25} />
                   </RadarChart>
                 </ResponsiveContainer>
@@ -258,6 +258,119 @@ export default function Home() {
           </>
         )}
       </div>
+      {/* チャット */}
+      <div className={styles.card}>
+        <div className={styles.cardLabel}>
+          <div className={styles.cardLabelBar} />
+          <span className={styles.cardLabelText}>AIコーチに質問する</span>
+        </div>
+        <p style={{ fontSize: "12px", color: "#666", marginBottom: "16px" }}>
+          分析結果をもとに具体的な質問に答えます
+        </p>
+
+        {/* メッセージ履歴 */}
+        <div style={{ marginBottom: "16px", maxHeight: "400px", overflowY: "auto" }}>
+          {chatMessages.length === 0 && (
+            <div style={{ textAlign: "center", color: "#444", fontSize: "13px", padding: "24px 0" }}>
+              分析結果について何でも質問してください
+            </div>
+          )}
+          {chatMessages.map((msg, i) => (
+            <div key={i} style={{
+              marginBottom: "12px",
+              display: "flex",
+              justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+            }}>
+              <div style={{
+                maxWidth: "80%",
+                padding: "10px 14px",
+                borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+                background: msg.role === "user" ? "#e53e3e" : "#2a2b2e",
+                color: "#fff",
+                fontSize: "14px",
+                lineHeight: "1.6",
+              }}>
+                {msg.category && (
+                  <div style={{ fontSize: "11px", color: "#aaa", marginBottom: "6px" }}>
+                    [{msg.category}]
+                  </div>
+                )}
+                {msg.content}
+              </div>
+            </div>
+          ))}
+          {chatLoading && (
+            <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: "12px" }}>
+              <div style={{ padding: "10px 14px", borderRadius: "12px 12px 12px 2px", background: "#2a2b2e", color: "#666", fontSize: "14px" }}>
+                回答中...
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 入力エリア */}
+        <div style={{ display: "flex", gap: "8px" }}>
+          <input
+            type="text"
+            value={chatInput}
+            onChange={e => setChatInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleChat()}
+            placeholder="例：スタンス幅を改善するには？"
+            className={styles.input}
+            style={{ flex: 1 }}
+          />
+          <button
+            onClick={handleChat}
+            disabled={chatLoading || !chatInput.trim()}
+            style={{
+              padding: "10px 20px",
+              borderRadius: "8px",
+              border: "none",
+              background: chatLoading || !chatInput.trim() ? "#333" : "#e53e3e",
+              color: chatLoading || !chatInput.trim() ? "#666" : "#fff",
+              fontSize: "14px",
+              cursor: chatLoading || !chatInput.trim() ? "not-allowed" : "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            送信
+          </button>
+        </div>
+      </div>
     </div>
+    
   )
+
+  async function handleChat() {
+    if (!chatInput.trim() || !result) return
+    const question = chatInput.trim()
+    setChatInput("")
+    setChatMessages(prev => [...prev, { role: "user", content: question }])
+    setChatLoading(true)
+
+    try {
+      const res = await fetch("http://localhost:8000/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question,
+          analysis_data: result,
+        }),
+      })
+      const data = await res.json()
+      setChatMessages(prev => [...prev, {
+        role: "assistant",
+        content: data.answer,
+        category: data.category,
+      }])
+    } catch {
+      setChatMessages(prev => [...prev, {
+        role: "assistant",
+        content: "エラーが発生しました。もう一度試してください。",
+      }])
+    } finally {
+      setChatLoading(false)
+    }
+  }
+  
 }
