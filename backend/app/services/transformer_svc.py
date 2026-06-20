@@ -20,7 +20,7 @@ def _load_classifier():
     print("🤖 Transformerモデル読み込み中...")
     _classifier = pipeline(
         "zero-shot-classification",
-        model="cross-encoder/nli-MiniLM2-L6-H768",
+        model="cross-encoder/nli-deberta-v3-small",
     )
     print("✅ Transformerモデル読み込み完了")
     return _classifier
