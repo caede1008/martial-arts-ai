@@ -25,6 +25,7 @@ type Result = {
     top_score: number
   }
   analysis: string
+  infographic: string
   message: string
 }
 
@@ -81,7 +82,9 @@ export default function Home() {
       const res = await fetch("http://localhost:8000/api/analyze", {
         method: "POST", body: formData,
       })
+      
       const data = await res.json()
+      console.log("infographic:", data.infographic ? "あり" : "なし")
       if (data.error) setError(data.error)
       else setResult(data)
     } catch {
@@ -288,6 +291,21 @@ export default function Home() {
                 </ReactMarkdown>
               </div>
             </div>
+
+            {/* インフォグラフィック */}
+            {result.infographic && (
+              <div className={styles.card}>
+                <div className={styles.cardLabel}>
+                  <div className={styles.cardLabelBar} />
+                  <span className={styles.cardLabelText}>分析インフォグラフィック</span>
+                </div>
+                <img
+                  src={`data:image/png;base64,${result.infographic}`}
+                  alt="骨格ビジュアライズ"
+                  style={{ width: "60%", display: "block", margin: "0 auto", borderRadius: "8px" }}
+                />
+              </div>
+            )}
 
             {/* チャット */}
             <div className={styles.card}>

@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from app.services import vector_store
 from app.services.rag_svc import retrieve_similar_fighters
 from app.services import cnn_svc
+from app.services import infographic_svc
 from app.routers import chat
 
 
@@ -124,10 +125,17 @@ async def analyze(
 
     analysis = message.content[0].text
 
+    # 骨格ビジュアライズ生成
+    infographic = infographic_svc.generate_skeleton_visualization(
+        image_bytes=contents,
+        landmarks=lm,
+    )
+
     return {
         "filename": image.filename,
         "scores": scores,
         "cnn_result": cnn_result,
         "analysis": analysis,
+        "infographic": infographic,
         "message": "分析完了"
     }
