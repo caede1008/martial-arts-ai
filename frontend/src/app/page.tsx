@@ -59,13 +59,15 @@ export default function Home() {
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
+    console.log("ファイル選択:", f)
     if (!f) return
     setFile(f)
     setPreview(URL.createObjectURL(f))
     setResult(null)
     setError("")
+    console.log("ファイルセット完了:", f.name)
   }
-
+  
   async function handleSubmit() {
     if (!file) { setError("画像を選択してください。"); return }
     setLoading(true)
@@ -79,7 +81,7 @@ export default function Home() {
       formData.append("age", age || "0")
       formData.append("background", background)
       formData.append("strong_move", strongMove)
-      const res = await fetch("http://localhost:8000/api/analyze", {
+      const res = await fetch("/api/proxy?path=/api/analyze", {
         method: "POST", body: formData,
       })
       
@@ -101,7 +103,7 @@ export default function Home() {
     setChatMessages(prev => [...prev, { role: "user", content: question }])
     setChatLoading(true)
     try {
-      const res = await fetch("http://localhost:8000/api/chat", {
+      const res = await fetch("/api/proxy?path=/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
