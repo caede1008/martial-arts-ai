@@ -90,15 +90,22 @@ def generate_skeleton_visualization(image_bytes: bytes, landmarks: list) -> str:
         cv2.circle(img, (x, y), 6, (255, 255, 255), -1, cv2.LINE_AA)
         cv2.circle(img, (x, y), 4, (229, 62, 62), -1, cv2.LINE_AA)
 
-    # リーチラインを描画（左手首〜右手首）
-    lw = landmarks[15]
-    rw = landmarks[16]
-    if lw.visibility > 0.5 and rw.visibility > 0.5:
-        x1, y1 = int(lw.x * w), int(lw.y * h)
-        x2, y2 = int(rw.x * w), int(rw.y * h)
-        cv2.line(img, (x1, y1), (x2, y2), (255, 215, 0), 2, cv2.LINE_AA)
-        cv2.putText(img, "REACH", ((x1 + x2) // 2 - 30, (y1 + y2) // 2 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 215, 0), 2)
+    # リーチラインを描画（左手 → 左手首 → 左肘 → 左肩 → 右肩 → 右肘 → 右手首 → 右手）
+    REACH_INDICES = [19, 15, 13, 11, 12, 14, 16, 20]
+    reach_points = [landmarks[i] for i in REACH_INDICES]
+
+    if all(p.visibility > 0.5 for p in reach_points):
+        coords = [(int(p.x * w), int(p.y * h)) for p in reach_points]
+
+        # 折れ線を描画
+        for i in range(len(coords) - 1):
+            cv2.line(img, coords[i], coords[i + 1], (255, 215, 0), 2, cv2.LINE_AA)
+
+        # ラベルは肩の中点あたりに表示
+        mid_x = (coords[3][0] + coords[4][0]) // 2
+        mid_y = (coords[3][1] + coords[4][1]) // 2
+        cv2.putText(img, "REACH", (mid_x - 30, mid_y - 10),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 215, 0), 2)
 
     # 凡例を描画
     legend_items = [
